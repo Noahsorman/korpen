@@ -55,42 +55,113 @@
   max-width: 100%;
   margin: 0 auto;
   text-align: center;
-  border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
 }
 
+.rotate {
+  position: absolute;
+  left: calc(50% - 60px);
+  width: 120px;
+  height: 120px;
+  -webkit-animation: spin 2s linear infinite;
+  -moz-animation: spin 2s linear infinite;
+  animation: spin 2s linear infinite;
+}
+
+@-moz-keyframes spin {
+  100% {
+    -moz-transform: rotate(360deg);
+  }
+}
+
+@-webkit-keyframes spin {
+  100% {
+    -webkit-transform: rotate(360deg);
+  }
+}
+
+@keyframes spin {
+  100% {
+    -webkit-transform: rotate(360deg);
+    transform: rotate(360deg);
+  }
+}
+
+.rotate2 {
+  position: absolute;
+  left: calc(50% - 60px);
+  width: 120px;
+  height: 120px;
+  -webkit-animation: spin2 2s linear infinite;
+  -moz-animation: spin2 2s linear infinite;
+  animation: spin2 2s linear infinite;
+}
+
+@-moz-keyframes spin2 {
+  100% {
+    -moz-transform: rotate(-360deg);
+  }
+}
+
+@-webkit-keyframes spin2 {
+  100% {
+    -webkit-transform: rotate(-360deg);
+  }
+}
+
+@keyframes spin2 {
+  100% {
+    -webkit-transform: rotate(-360deg);
+    transform: rotate(-360deg);
+  }
+}
+
 body {
   margin: 0;
+  background: linear-gradient(to bottom, #222 40%, #333 70%, #222);
+  color: hsl(0, 0%, 90%)
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  /* Tar bort horisontell scroll */
+  height: 100%;
+  position: relative;
 }
 
 h1,
 h2 {
   font-family: var(--heading);
   font-weight: 500;
-  color: var(--text-h);
 }
 
 h1 {
   font-size: 56px;
   letter-spacing: -1.68px;
   margin: 32px 0;
+
   @media (max-width: 1024px) {
     font-size: 36px;
     margin: 20px 0;
   }
 }
+
 h2 {
   font-size: 24px;
   line-height: 118%;
   letter-spacing: -0.24px;
   margin: 0 0 8px;
+
   @media (max-width: 1024px) {
     font-size: 20px;
   }
 }
+
 p {
   margin: 0;
 }

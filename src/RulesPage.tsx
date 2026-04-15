@@ -1,15 +1,23 @@
-import React from 'react';
+export const pointsTemplate = {
+  goals: {name: "Mål", st: 10, mf: 6, df: 3, gk: 0},
+  assists: {name: 'Assist', st: 9, mf: 6, df: 4, gk: 0},
+  yellowCard: {name: 'Gult kort', st: -5, mf: -5, df: -2, gk: -5 },
+  redCard: {name: 'Rött kort', st: -10, mf: -10, df: -5, gk: -10 },
+  played: {name: 'Närvaro', st: 1, mf: 1, df: 1, gk: 1 }
+}
 
-const RulesPage = () => {
-  const scoringData = [
-    { event: 'Mål', st: '+5', mf: '+6', df: '+8', gk: '+10' },
-    { event: 'Assist', st: '+2', mf: '+4', df: '+4', gk: '+5' },
-    { event: 'Hållen nolla', st: '0', mf: '+1', df: '+5', gk: '+7' },
-    { event: 'Vinst', st: '+3', mf: '+3', df: '+3', gk: '+3' },
-    { event: 'Insläppt (per 2 mål)', st: '0', mf: '0', df: '-1', gk: '-2' },
-    { event: 'Gult/Rött kort', st: '-2/-5', mf: '-2/-5', df: '-2/-5', gk: '-2/-5' },
-  ];
+export const pricerTemplate = {
+  win: { name: "Vinst", diff: 1 },
+  loss: { name: "Förlust", diff: -1 },
+  cleanSheet: { name: "Hållen nolla", diff: 1 },
+  goal: { name: "Mål", diff: 2 },
+  assist: { name: "Assist", diff: 1 },
+  absent: { name: "Ej medverkande", diff: -2 },
+  yellowCard: { name: "Gult kort", diff: -2},
+  redCard: { name: "Rött kort", diff: -4},
+};
 
+const RulesPage = () => {  
   return (
     <div className="min-h-screen bg-[#101010] text-white p-4 md:p-12 font-sans pb-24">
       <div className="max-w-4xl mx-auto">
@@ -26,10 +34,10 @@ const RulesPage = () => {
         {/* Poängtabell */}
         <section className="mb-12">
           <h2 className="text-xl font-bold mb-6 flex items-center gap-2 italic uppercase">
-            <span className="w-2 h-6 bg-[#39ff14]"></span> Poängfördelning
+            <span className="w-2 h-6 bg-[#39ff14]">Poängfördelning</span>
           </h2>
           <div className="overflow-x-auto rounded-2xl border border-white/5 bg-[#1a1a1a]">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse" style={{ textAlign: "left" }}>
               <thead>
                 <tr className="bg-white/5 text-[10px] uppercase tracking-widest text-gray-500">
                   <th className="p-4">Händelse</th>
@@ -40,13 +48,38 @@ const RulesPage = () => {
                 </tr>
               </thead>
               <tbody className="text-sm font-mono">
-                {scoringData.map((row, i) => (
+                {Object.values(pointsTemplate).map((event, i) => (
                   <tr key={i} className="border-t border-white/5 hover:bg-white/[0.02] transition-colors">
-                    <td className="p-4 font-sans text-gray-300">{row.event}</td>
-                    <td className="p-4 text-white font-bold">{row.st}</td>
-                    <td className="p-4 text-white font-bold">{row.mf}</td>
-                    <td className="p-4 text-white font-bold">{row.df}</td>
-                    <td className="p-4 text-white font-bold">{row.gk}</td>
+                    <td className="p-4 font-sans text-gray-300" style={{ paddingRight: 10 }}>{event.name}</td>
+                    <td className="p-4 text-white font-bold">{event.st}</td>
+                    <td className="p-4 text-white font-bold">{event.mf}</td>
+                    <td className="p-4 text-white font-bold">{event.df}</td>
+                    <td className="p-4 text-white font-bold">{event.gk}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <hr />
+        {/* Poängtabell */}
+        <section className="mb-12 mt-12" style={{marginBottom: "4rem"}}>
+          <h2 className="text-xl font-bold mb-6 flex items-center gap-2 italic uppercase">
+            <span className="w-2 h-6 bg-[#39ff14]">Truppvärdering ($)</span>
+          </h2>
+          <div className="overflow-x-auto rounded-2xl border border-white/5 bg-[#1a1a1a]">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-white/5 text-[10px] uppercase tracking-widest text-gray-500">
+                  <th className="p-4">Händelse</th>
+                  <th className="p-4 text-[#39ff14]">Prisskillnad</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm font-mono">
+                {Object.values(pricerTemplate).map((row, i) => (
+                  <tr key={i} className="border-t border-white/5 hover:bg-white/[0.02] transition-colors" style={{ textAlign: "left" }}>
+                    <td className="p-4 font-sans text-gray-300" style={{ paddingRight: 10 }}>{row.name}</td>
+                    <td className="p-4 text-white font-bold">{row.diff >= 0 ? `+`: ""}{row.diff}</td>
                   </tr>
                 ))}
               </tbody>

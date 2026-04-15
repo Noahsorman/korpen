@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from './firebaseConfig';
-import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { useAuth } from './AuthContext';
+import LoadingModal from './LoadingModal';
+import { waitFor } from './waitFor';
+import type { Team } from "./AuthContext"
 
-interface Player {
-  id: string;
-  name: string;
-  cost: number;
-  image: string;
-  position: 'GK' | 'DF' | 'MF' | 'ST';
-}
 
 const theme = {
   colors: {
@@ -24,73 +20,96 @@ const theme = {
 
 const TeamBuilder = () => {
   // 1-2-2-1 Formation (6 spelare totalt)
-  const [myTeam, setMyTeam] = useState<Record<string, string | null>>({
-    ST1: null,
-    MF1: null, MF2: null,
-    DF1: null, DF2: null,
-    GK1: null
-  });
-  const [oldTeam, setOldTeam] = useState<Record<string, string | null>>({
-    ST1: null,
-    MF1: null, MF2: null,
-    DF1: null, DF2: null,
-    GK1: null
-  });
-  const [isLocked, setIsLocked] = useState(false);
-  const [selectingSlot, setSelectingSlot] = useState<string | null>(null);
-  const { players } = useAuth()
+  // const [myTeam, setMyTeam] = useState<Record<string, string | null>>({
+  //   ST1: null,
+  //   MF1: null, MF2: null,
+  //   DF1: null, DF2: null,
+  //   GK1: null
+  // });
+  // const [oldTeam, setOldTeam] = useState<Record<string, string | null>>({
+  //   ST1: null,
+  //   MF1: null, MF2: null,
+  //   DF1: null, DF2: null,
+  //   GK1: null
+  // });
+  const isLocked = false;
+  const [selectingSlot, setSelectingSlot] = useState<keyof Team["players"] | null>(null);
+  const { players, teams, user } = useAuth()
+  const [loadingText, setLoadingText] = useState<string | undefined>(undefined)
 
-  useEffect(() => {
-    fetchInitialData();
-  }, []);
-
-  const fetchInitialData = async () => {
-    if(!auth.currentUser?.uid) return;
-    const pSnap = await getDocs(collection(db, 'player'));
-    const tSnap = await getDoc(doc(db, 'teams', auth.currentUser.uid));
-
-    const dataPlayers = pSnap.docs
-      .map(d => ({ id: d.id, ...d.data() } as Player))
-      .sort((a, b) => b.cost - a.cost)
-
-    const data = tSnap.exists() ? tSnap.data().players : {
+  const [myTeam, setMyTeam] = useState<Team>({
+    budget: 100,
+    id: user?.uid ?? "unkown",
+    owner: user?.displayName ?? user?.email ?? "unkown",
+    points: 0,
+    players: {
       ST1: null,
       MF1: null, MF2: null,
       DF1: null, DF2: null,
       GK1: null
-    };
+    }
+  })
+  const [oldTeam, setOldTeam] = useState<Team>({
+    budget: 100,
+    id: user?.uid ?? "unkown",
+    owner: user?.displayName ?? user?.email ?? "unkown",
+    points: 0,
+    players: {
+      ST1: null,
+      MF1: null, MF2: null,
+      DF1: null, DF2: null,
+      GK1: null
+    }
+  })
 
-    setMyTeam(data);
-    setOldTeam(data)
-    // Här kan du lägga till match-lock logiken igen om du vill
-  };
+  useEffect(() => {
+    const mt = teams.find(t => t.id === user?.uid)
+    console.log({ teams, mt })
+    if (!mt) return;
+
+    setMyTeam(mt)
+    setOldTeam(mt)
+  }, [teams]);
 
   const uploadTeam = async () => {
-    if(!auth.currentUser?.uid) return
+    console.log("foo")
+    if (!auth.currentUser?.uid) return alert("Du är inte autentiserad")
+    setLoadingText("Laddar upp lag")
 
-    const teamData = {
-      players: myTeam,
-      owner: auth.currentUser?.displayName || 'Unknown',
-      timestamp: new Date()
-    }
+    await waitFor(.5)
 
-    await setDoc(doc(db, 'teams', auth.currentUser.uid), teamData, {merge:true});
+    let teamData = JSON.parse(JSON.stringify(myTeam)) as Omit<Team, "id"> & {id?: string}
+    delete teamData.id
+
+    await setDoc(doc(db, 'teams', auth.currentUser.uid), myTeam, { merge: true });
     setOldTeam(myTeam)
+    setLoadingText(undefined)
   }
 
-  const totalCost = Object.values(myTeam)
+  const totalCost = Object.values(myTeam.players)
     .map(id => players.find(p => p.id === id)?.cost || 0)
     .reduce((a, b) => a + b, 0);
 
+  const teamHasChanged = !Object.keys(myTeam.players).every((key) =>
+    myTeam.players[key as keyof typeof myTeam.players] === oldTeam.players[key as keyof typeof oldTeam.players]
+  )
+
   const selectPlayer = (playerId: string) => {
+    console.log({ selectingSlot, playerId })
     if (!selectingSlot) return;
-    setMyTeam(prev => ({ ...prev, [selectingSlot]: playerId }));
+    setMyTeam(prev => ({
+      ...prev,
+      players: {
+        ...prev.players,
+        [selectingSlot]: playerId
+      }
+    }));
     setSelectingSlot(null);
-    setTimeout(() => console.log({myTeam, oldTeam}), 100); // För att se uppdateringen i konsolen
+    setTimeout(() => console.log({ myTeam, oldTeam }), 100); // För att se uppdateringen i konsolen
   };
 
-  const PlayerSlot = ({ slotId, label }: { slotId: string, label: string }) => {
-    const player = players.find(p => p.id === myTeam[slotId]);
+  const PlayerSlot = ({ slotId, label }: { slotId: keyof Team["players"], label: string }) => {
+    const player = players.find(p => p.id === myTeam.players[slotId]);
     return (
       <button
         onClick={() => !isLocked && setSelectingSlot(slotId)}
@@ -113,8 +132,8 @@ const TeamBuilder = () => {
           {label}
         </div>
         <div style={{
-          width: 80,
-          height: 80,
+          width: 55,
+          height: 55,
           borderRadius: 12,
 
         }}>
@@ -126,7 +145,7 @@ const TeamBuilder = () => {
               borderRadius: 20,
             }} />
           ) : (
-            <span className="text-gray-600 text-xl">+</span>
+            <span className=" text-xl" style={{ color: "white" }}>+</span>
           )}
         </div>
 
@@ -143,7 +162,7 @@ const TeamBuilder = () => {
             }}>
               {player.name.split(' ')[0]}
             </div>
-            <span>${player.cost}</span>
+            <span style={{ color: "white" }}>${player.cost}</span>
           </>
         }
       </button>
@@ -158,23 +177,60 @@ const TeamBuilder = () => {
         height: "100vh",
         display: "flex",
         flexDirection: "column",
+        position: "relative"
       }}>
 
       {/* Header med Budget */}
-      <div className="w-full max-w-md flex justify-between items-center mb-6">
-        <h1 className="text-xl font-black italic tracking-tight text-[#39ff14]">UNATLETICO MADRID</h1>
-        <div className="text-right">
-          <p className={`text-2xl font-mono font-bold ${totalCost > 100 ? 'text-red-500' : 'text-white'}`}
-            style={{
-              color: totalCost > 100 ? theme.colors.error : theme.colors.text,
-              fontWeight: 'bold',
-              fontSize: 24,
-            }}
-          >
-            ${totalCost}<span className="text-xs text-gray-500">/100</span>
-          </p>
-        </div>
+      <div style={{
+        position: "absolute",
+        left: "1rem",
+        top: "1rem",
+      }}>
+        <p className={`text-2xl font-mono font-bold ${totalCost > myTeam.budget ? 'text-red-500' : 'text-white'}`}
+          style={{
+            color: totalCost > myTeam.budget ? theme.colors.error : theme.colors.text,
+            fontWeight: 'bold',
+            fontSize: 24,
+          }}
+        >
+          ${totalCost}<span className="text-xs">/{myTeam.budget}</span>
+        </p>
       </div>
+
+      <button
+        disabled={isLocked || totalCost > myTeam.budget || Object.values(myTeam.players).includes(null) || !teamHasChanged}
+        className={`w-full max-w-md mt-8 py-4 rounded-2xl font-black text-lg transition-all
+          ${totalCost > myTeam.budget
+            ? 'bg-red-600/20 text-red-500 border border-red-600/50 cursor-not-allowed'
+            : 'bg-[#39ff14] text-black shadow-[0_10px_20px_rgba(57,255,20,0.3)] active:scale-95'
+          }`}
+        style={{
+          padding: 16,
+          fontWeight: 'bold',
+          fontSize: 18,
+          backgroundColor: totalCost > myTeam.budget ? theme.colors.error + '20' :
+            !teamHasChanged ?
+              'rgba(57, 255, 20, 0.5)' :
+              theme.colors.primary,
+          color: totalCost > myTeam.budget ? theme.colors.error : 'black',
+          border: totalCost > myTeam.budget ? `1px solid ${theme.colors.error}50` : 'none',
+          cursor: isLocked || (totalCost > myTeam.budget) || Object.values(myTeam.players).includes(null) || !teamHasChanged ? 'not-allowed' : 'pointer',
+          position: "absolute",
+          right: 0,
+          width: "30%",
+          margin: "1rem",
+          borderRadius: 25,
+          boxShadow: "2px 2px 10px black",
+          zIndex: 5
+        }}
+        onClick={uploadTeam}
+      >
+        {
+          totalCost > myTeam.budget ? 'ÖVER BUDGET' :
+            !teamHasChanged ? 'Gör ändringar för att spara'
+              : 'SPARA LAG'
+        }
+      </button>
 
       {/* PLANEN */}
       <div
@@ -185,6 +241,7 @@ const TeamBuilder = () => {
           flexDirection: 'column',
           alignItems: 'center',
           padding: 16,
+          overflowY: selectingSlot ? "hidden" : "auto"
         }}>
         {/* Rad 1: Striker */}
         <div style={{
@@ -192,7 +249,7 @@ const TeamBuilder = () => {
           justifyContent: 'space-around',
           width: '100%',
           maxWidth: 400,
-          zIndex: 10,
+          zIndex: 3,
         }}>
           <PlayerSlot slotId="ST1" label="Striker" />
         </div>
@@ -203,7 +260,7 @@ const TeamBuilder = () => {
           justifyContent: 'space-around',
           width: '100%',
           maxWidth: 400,
-          zIndex: 10
+          zIndex: 3
         }}>
           <PlayerSlot slotId="MF1" label="Mittfält" />
           <PlayerSlot slotId="MF2" label="Mittfält" />
@@ -215,7 +272,7 @@ const TeamBuilder = () => {
           justifyContent: 'space-around',
           width: '100%',
           maxWidth: 400,
-          zIndex: 10
+          zIndex: 3
         }}>
           <PlayerSlot slotId="DF1" label="Back" />
           <PlayerSlot slotId="DF2" label="Back" />
@@ -227,40 +284,12 @@ const TeamBuilder = () => {
           justifyContent: 'space-around',
           width: '100%',
           maxWidth: 400,
-          zIndex: 10
+          zIndex: 3,
+          marginBottom: "5rem"
         }}>
           <PlayerSlot slotId="GK1" label="Målvakt" />
         </div>
       </div>
-
-      {/* Spara-knapp */}
-      <button
-        disabled={isLocked || totalCost > 100 || Object.values(myTeam).includes(null)}
-        className={`w-full max-w-md mt-8 py-4 rounded-2xl font-black text-lg transition-all
-          ${totalCost > 100
-            ? 'bg-red-600/20 text-red-500 border border-red-600/50 cursor-not-allowed'
-            : 'bg-[#39ff14] text-black shadow-[0_10px_20px_rgba(57,255,20,0.3)] active:scale-95'
-          }`}
-        style={{
-          padding: 16,
-          fontWeight: 'bold',
-          fontSize: 18,
-          backgroundColor: totalCost > 100 ? theme.colors.error + '20' : 
-          Object.keys(myTeam).every(key => myTeam[key] === oldTeam[key]) ?
-            'rgba(57, 255, 20, 0.5)' :
-            theme.colors.primary,
-          color: totalCost > 100 ? theme.colors.error : 'black',
-          border: totalCost > 100 ? `1px solid ${theme.colors.error}50` : 'none',
-          cursor: isLocked || totalCost > 100 || Object.values(myTeam).includes(null) || Object.keys(myTeam).every(key => myTeam[key] === oldTeam[key]) ? 'not-allowed' : 'pointer',
-        }}
-        onClick={uploadTeam}
-      >
-        {
-          totalCost > 100 ? 'SPARA (ÖVER BUDGET)' :
-          Object.keys(myTeam).every(key => myTeam[key] === oldTeam[key]) ? 'Gör ändringar för att spara' :
-          "SPARA LAGUPPSTÄLLNING"
-        }
-      </button>
 
       {/* Modal / Popup */}
       {selectingSlot && (
@@ -270,7 +299,7 @@ const TeamBuilder = () => {
             <h2 style={styles.modalTitle}>Välj spelare</h2>
             <div style={styles.modalContent}>
               {players.map(p => {
-                const isSelected = Object.values(myTeam).includes(p.id);
+                const isSelected = Object.values(myTeam.players).includes(p.id);
                 return (
                   <button
                     key={p.id}
@@ -295,7 +324,7 @@ const TeamBuilder = () => {
                         height: 80,
                         borderRadius: 12,
                         overflow: 'hidden',
-                        flexShrink: 0,                        
+                        flexShrink: 0,
                       }}>
                         <img src={p.image} style={{
                           objectFit: 'cover',
@@ -309,10 +338,10 @@ const TeamBuilder = () => {
                         justifyContent: "center",
                         display: "flex"
                       }}>
-                        <p className="font-bold text-white">{p.name}</p>
+                        <p className="font-bold text-white" style={{ color: "white" }}>{p.name}</p>
                       </div>
                     </div>
-                    <span className="font-mono font-bold text-[#39ff14]">${p.cost}</span>
+                    <span className="font-mono font-bold text-[#39ff14]" style={{ color: "white" }}>${p.cost}</span>
                   </button>
                 );
               })}
@@ -321,6 +350,9 @@ const TeamBuilder = () => {
           </div>
         </div>
       )}
+      <LoadingModal
+        text={loadingText}
+      />
     </div>
   );
 };

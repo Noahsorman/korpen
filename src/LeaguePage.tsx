@@ -1,54 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { db } from './firebaseConfig';
-import { collection, getDocs } from "firebase/firestore";
-
-interface Player {
-  id: string;
-  image: string;
-}
-
-interface Team {
-  id: string;
-  owner: string;
-  points: number;
-  players: {
-    ST1: string;
-    MF1: string;
-    MF2: string;
-    DF1: string;
-    DF2: string;
-    GK1: string;
-  };
-}
+import { useAuth } from './AuthContext';
 
 const LeaguePage = () => {
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [allPlayers, setAllPlayers] = useState<Record<string, string>>({}); // ID -> ImageURL
-  const [loading, setLoading] = useState(true);
+  const { teams, players } = useAuth()
 
-  useEffect(() => {
-    const fetchData = async () => {
-      // 1. Hämta alla spelare för att få tillgång till deras bilder
-      const pSnap = await getDocs(collection(db, 'player'));
-      const playerMap: Record<string, string> = {};
-      pSnap.docs.forEach(doc => {
-        playerMap[doc.id] = doc.data().image;
-      });
-      setAllPlayers(playerMap);
-
-      // 2. Hämta alla lag i ligan
-      const tSnap = await getDocs(collection(db, 'teams'));
-      const tList = tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
-
-      // Sortera efter poäng (högst först)
-      setTeams(tList.sort((a, b) => b.points - a.points));
-      setLoading(false);
-    };
-
-    fetchData();
-  }, []);
-
-  if (loading) return <div className="p-8 text-[#39ff14] font-mono">Laddar ligan...</div>;
+  const positionOrder = ['ST1', 'MF2', 'MF1', 'DF2', 'DF1', 'GK1'];
 
   return (
     <div className="min-h-screen bg-[#101010] text-white p-4 md:p-8 font-sans">
@@ -60,7 +15,7 @@ const LeaguePage = () => {
         <div className="grid gap-4">
           {teams.map((team, index) => (
             <div
-              key={team.id}
+              key={index}
               style={{
                 padding: 16,
                 margin: "0rem 3rem 2rem 3rem",
@@ -92,20 +47,22 @@ const LeaguePage = () => {
                 {/* Spelarbilder */}
                 <div style={{
                   display: "flex",
-                  flexDirection: "row",
-                  gap: 8,
+                  flexDirection: "row",                  
 
                 }}>
-                  {Object.keys(team.players).map((position: string, i) => {
-                    const img = allPlayers[team.players[position as keyof typeof team.players]];
+                  {Object.entries(team.players)
+                    .sort(([posA], [posB]) => positionOrder.indexOf(posA) - positionOrder.indexOf(posB))
+                    .map(([position, playerId], i) => {
 
-                    return<div style={{position: "relative", marginBottom: 16}} key={i}>
+                    const player = players.find(p => p.id === playerId)
+
+                    return<div style={{position: "relative", marginBottom: 16, marginRight: -10}} key={i}>
                       <img
-                        src={img}
+                        src={player?.image}
                         alt="player"
                         style={{
-                          width: 50,
-                          height: 50,
+                          width: 40,
+                          height: 40,
                           borderRadius: "100%",
                           objectFit: 'cover',
                         }}
@@ -120,15 +77,20 @@ const LeaguePage = () => {
                         fontWeight: 'bold',
                         padding: '0px 5px',
                         textShadow: '1px 1px 20px black',
-                      }}>{position}</div>
+                      }}>{
+                        position.indexOf("DF") >= 0 ? "DF":
+                        position.indexOf("MF") >= 0 ? "MF":
+                        position.indexOf("ST") >= 0 ? "ST":
+                        "GK"
+                      }</div>
                     </div>
                   })}
                 </div>
 
                 {/* Poäng */}
                 <div className="col-span-2 text-left md:text-right">
-                  <span className="text-2xl font-mono font-bold text-[#39ff14]">{team.points}</span>
-                  <span className="text-[10px] text-gray-600 ml-1 uppercase">pts</span>
+                  <span className="text-2xl font-mono font-bold text-[#39ff14]">{team.points ?? 0}</span>
+                  <span className="text-[10px] text-gray-600 ml-1 uppercase"> poäng</span>
                 </div>
               </div>
             </div>
