@@ -1,14 +1,23 @@
-const LoadingModal = ({text}: {text: string | undefined}) => {
+const LoadingModal = ({text, image}: {text: string | undefined, image?:string}) => {
 
   if (!text) return <></>
 
   return <div style={styles.overlay}>
-    <div style={styles.modal}>
+    <div style={styles.modal}>      
       <div style={{padding: 10}}>
         <span className="rotate2" style={{overflow: "hidden", fontSize: 48}}>..</span>
         <span className="rotate" style={{overflow: "hidden", fontSize: 48}}>..</span>
       </div>
       <h1 style={{marginTop: "7rem"}}>{text}</h1>
+      <img 
+        src={`/korpen/${image}`}
+        style={{
+          opacity: .5,
+          //filter: "blur(1px)",
+          width: "50svw",
+          height: "50svh"
+        }}
+      />
     </div>
   </div>
 }

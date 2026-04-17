@@ -1,27 +1,7 @@
-import { useState } from "react"
+
 import { useAuth } from "./AuthContext"
-import { auth, db } from "./firebaseConfig";
-import { doc, Timestamp, writeBatch } from "firebase/firestore";
-import { pointsTemplate, pricerTemplate } from "./RulesPage";
 
-interface MatchPlayer {
-  id: "string",
-  played: boolean,
-  goals: number,
-  assists: number,
-  yellowCard: boolean,
-  redCard: boolean,
-}
 
-interface Match {
-  date: Timestamp,
-  played: boolean,
-  opponentsName: string,
-  opponentsColor: string,
-  teamGoals: number | undefined,
-  opponentGoals: number | undefined,
-  players: MatchPlayer[],
-}
 
 interface Player {
   id: string;
@@ -32,359 +12,164 @@ interface Player {
 }
 
 const PlayersPage = () => {
+  const { players, teams } = useAuth()
+  
 
-  const { players, setPlayers, teams, setTeams} = useAuth()
-  const [reportMatch, setReportMatch] = useState<Match | null>(null)
+  const getUsage = (p: Player) => {
+    if (teams.length === 0) return 0;
+    return Math.round((teams.reduce((prev, cur) => {
+      return prev + (Object.values(cur.players).some(p2 => p2 === p.id) ? 1 : 0)
+    }, 0) / teams.length) * 100)
+  }  
 
-
-  const updatePointsAndCost = async () => {
-    if (!reportMatch) return;
-    if(reportMatch.opponentGoals === undefined || reportMatch.teamGoals == undefined)
-        return alert("Matchresultat saknas!")
-
-    const newPlayers = JSON.parse(JSON.stringify(players)) as Player[]
-
-    // Update Player costs
-    newPlayers.map(p => {
-      const p2 = reportMatch.players.find(p2 => p2.id === p.id)
-      if (!p2) return;
-
-
-      // Kostnad/Pris
-      p.oldCost = p.cost
-      p.cost += reportMatch.teamGoals! > reportMatch.opponentGoals! ? pricerTemplate.win.diff : 0 //vinst
-      p.cost += reportMatch.teamGoals! < reportMatch.opponentGoals! ? pricerTemplate.loss.diff : 0 //förlust
-      p.cost += reportMatch.opponentGoals === 0 ? pricerTemplate.cleanSheet.diff : 0 //Hållen nolla
-      p.cost += p2.goals * pricerTemplate.goal.diff  //goals
-      p.cost += p2.assists * pricerTemplate.assist.diff // assist
-      p.cost += (!p2.played ? 1:0) * pricerTemplate.absent.diff // absent
-      p.cost += (p2.yellowCard ? 1:0) * pricerTemplate.yellowCard.diff // yellowCard
-      p.cost += (p2.redCard ? 1:0) * pricerTemplate.redCard.diff // redCard
-
-      if (p.cost < 10) p.cost = 10
-    })
-
-    const newTeams = teams.map(t => {
-      let points = Object.entries(t.players).reduce((prev, [pos, id]) => {
-        const p = reportMatch.players.find(p => p.id === id)
-        const p2 = newPlayers.find(p => p.id === id)
-        if (!p || !p2) return prev
-        
-
-        t.budget += p2.cost - p2.oldCost
-        const position = pos.substring(0, 2).toLocaleLowerCase() as "st" | "mf" | "df" | "gk"
-
-        const playerPoints = p.goals * pointsTemplate.goals[position]
-          + p.assists * pointsTemplate.assists[position]
-          + (p.yellowCard ? pointsTemplate.yellowCard[position] : 0)
-          + (p.redCard ? pointsTemplate.redCard[position] : 0)
-          + (p.played ? pointsTemplate.played[position] : 0)
-
-        prev += playerPoints
-
-        return prev
-      }, 0)
-      if(!t.points) t.points = 0
-      t.points += points
-      return t
-    })
-
-    newPlayers.sort((a, b) => b.cost - a.cost)
-    newTeams.sort((a, b) => b.points - a.points)
-
-    console.log({ newPlayers, newTeams })
-
-    setPlayers(newPlayers);
-    setTeams(newTeams)    
-
-    if (auth.currentUser?.uid === "7dUzXLycFUfL21pgMrxElNGZbTh1" && confirm("Uppdatera databasen? Detta går inte att ångra.")) {
-      const batch = writeBatch(db)
-      newPlayers.map(p => {
-        const { cost, oldCost, id } = p
-        batch.set(doc(db, "player", id), { cost, oldCost }, { merge: true })
-      })
-      newTeams.map(t => {
-        const {points, id} = t
-        batch.set(doc(db, "teams", id), { points }, { merge:true })
-      })
-      batch.commit();
-    } else alert("Värdena har endast uppdaterats på din enhet temporärt. Då du inte har tillräckliga behörigheter")
-
-    setReportMatch(null)
-  }
-
-  return <div>
-    <div style={{
-      display: "flex",
-      flexDirection: "column",
-      gap: 10,
-      justifyContent: "center",
-      padding: "2rem",
-      marginBottom: "5rem",
-      scrollbarWidth: "none",
-    }}>
-      <div style={{
-        display: "flex",
-        justifyContent: "right"
-      }}>
-        <span style={{
-          backgroundColor: "#ddd",
-          padding: 8,
-          borderRadius: 10,
-          fontWeight: 800,
-          color: "black"
-        }}
-          onClick={() => setReportMatch({
-            teamGoals: 0, opponentGoals: 0, players: players.reduce<MatchPlayer[]>((prev, cur) => {
-              const p = { id: cur.id, played: true, goals: 0, assists: 0 } as MatchPlayer
-              prev.push(p)
-              return prev
-            }, []), played: false, date: Timestamp.now(), opponentsName: "", opponentsColor: "red"
-          })}
-        >
-          RAPPORTERA MATCH
-        </span>
+  return (
+    <div style={styles.pageContainer}>
+      
+      {/* HEADER SECTION */}
+      <div style={styles.header}>
+        <h1 style={styles.title}>TRUPPEN <span style={{color: '#39ff14'}}>&</span> MARKNAD</h1>        
       </div>
-      {players.map(p => (
-        <div key={p.id} style={{
-          backgroundColor: "hsla(0, 0%, 0%, 80%)",
-          display: "flex",
-          height: "4rem",
-          borderRadius: "25px",
-          alignItems: "center",
-          gap: 8
-        }}>
-          <img src={p.image} alt={p.name} style={{
-            width: "3rem",
-            height: "3rem",
-            borderTopLeftRadius: "25px",
-            borderBottomLeftRadius: "25px"
-          }} />
-          <div style={{
-            textTransform: "uppercase",
-            fontWeight: 700,
-            letterSpacing: 1,
-            flexGrow: 1
-          }}>{p.name}</div>
-          <div style={{
-            width: "5rem",
-            textAlign: "left"
 
-          }}>
-            <div>Cost: ${p.cost}</div>
-            <div>Points: 0</div>
+      {/* PLAYER LIST */}
+      <div style={styles.playerList}>
+        {players.map(p => (
+          <div key={p.id} style={styles.playerCard}>
+            <div style={styles.imageContainer}>
+              <img src={p.image} alt={p.name} style={styles.playerImg} />
+            </div>
+            
+            <div style={styles.playerInfo}>
+              <div style={styles.playerName}>{p.name}</div>
+              <div style={styles.playerStats}>
+                ÄGD AV {getUsage(p)}%
+              </div>
+            </div>
+
+            <div style={styles.priceTag}>
+              <span style={styles.priceLabel}>PRIS</span>
+              <span style={styles.priceValue}>{p.cost}$</span>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>      
     </div>
-    {/* Modal / Popup */}
-    {reportMatch && (
-      <div style={styles.overlay} onClick={() => setReportMatch(null)}>
-        <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-          <button style={styles.closeBtn} onClick={() => setReportMatch(null)}>✕</button>
-          <h2 style={styles.modalTitle}>Rapportera match</h2>
-          <div style={styles.modalContent}>
-            <div>
-              <h3>Slutresultat</h3>
-              <div style={{ display: "flex", padding: "0 2rem", gap: 5, justifyContent: "center", alignItems: "center" }}>
-                <div style={{ width: "4rem", fontSize: 16 }}>Vi</div>
-                <div style={{
-                  width: "2rem",
-                  height: 4
-                }} />
-                <div style={{ width: "4rem", fontSize: 16 }}>Dem</div>
-              </div>
-              <div style={{ display: "flex", padding: "0 2rem", gap: 5, justifyContent: "center", alignItems: "center" }}>
-                <input style={{ width: "4rem", fontSize: 24, textAlign: "center" }}
-                  value={reportMatch.teamGoals ?? ""}
-                  onChange={(e) => setReportMatch(rm => {
-                    if (!rm) return null
-                    let value: number | undefined = parseInt(e.target.value)
-                    if(isNaN(value)) value = undefined
-                    return { ...rm, teamGoals: value}
-                  })}
-                />
-                <div style={{
-                  backgroundColor: "gray",
-                  width: "2rem",
-                  height: 4
-                }} />
-                <input style={{ width: "4rem", fontSize: 24, textAlign: "center" }}
-                  value={reportMatch.opponentGoals ?? ""}
-                  onChange={(e) => setReportMatch(rm => {
-                    if (!rm) return null
-                    let value: number | undefined = parseInt(e.target.value)
-                    if(isNaN(value)) value = undefined
-                    return { ...rm, opponentGoals: value}
-                  })}
-                />
-              </div>
-            </div>
-            <div>
-              <table style={{
-                width: "100%",
-                columnGap: 10,
-                rowGap: 5,
-              }}>
-                <thead>
-                  <tr>
-                    <th style={{width: ".5rem", writingMode: "sideways-lr"}}>Medverkat</th>
-                    <th>Spelare</th>
-                    <th>Mål</th>
-                    <th>Assist</th>
-                    <th style={{width: ".5rem", writingMode: "sideways-lr", color: "yellow"}}>Gult kort</th>
-                    <th style={{width: ".5rem", writingMode: "sideways-lr", color: "tomato"}}>Rött kort</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportMatch.players.map(p => (
-                    <tr key={p.id} style={{
-                      width: "100%"
-                    }}>
-                      <td style={{width: ".5rem"}}>
-                        <input type="checkbox" style={{ width: "1.2rem", height: "1.2rem" }}
-                          checked={p.played}
-                          onChange={e => setReportMatch(rm => {
-                            if (!rm) return rm
-                            const copy = JSON.parse(JSON.stringify(rm)) as Match
-                            let p2 = copy.players.find(p2 => p2.id === p.id)
-                            if (!p2) return copy
-                            p2.played = e.target.checked
-                            p2.goals = 0
-                            p2.assists = 0
-                            p2.yellowCard = false
-                            p2.redCard = false
-                            return copy
-                          })}
-                        />
-                      </td>
-                      <td style={{ textAlign: "left", paddingRight: 8 }}>{players.find(p2 => p2.id === p.id)?.name}</td>
-                      <td>
-                        <input type="number" step={1} min={0} placeholder="0" style={{
-                          width: "1.5rem",
-                          display: p.played ? undefined : "none"
-                        }}
-                          value={p.goals}
-                          onChange={e => setReportMatch(rm => {
-                            if (!rm) return rm
-                            const copy = JSON.parse(JSON.stringify(rm)) as Match
-                            let i = copy.players.findIndex(p2 => p2.id === p.id)
-                            if (i >= 0) copy.players[i].goals = parseInt(e?.target?.value) ?? 0
-
-                            return copy
-                          })}
-                          disabled={!p.played}
-                        />
-                      </td>
-                      <td>
-                        <input type="number" step={1} min={0} placeholder="0" style={{
-                          width: "1.5rem",
-                          display: p.played ? undefined : "none"
-                        }}
-                          value={p.assists}
-                          onChange={e => setReportMatch(rm => {
-                            if (!rm) return rm
-                            const copy = JSON.parse(JSON.stringify(rm)) as Match
-                            let i = copy.players.findIndex(p2 => p2.id === p.id)
-                            if (i >= 0) copy.players[i].assists = parseInt(e?.target?.value) ?? 0
-
-                            return copy
-                          })}
-                        />
-                      </td>
-                      <td>
-                        <input type="checkbox" style={{ width: "1.2rem", height: "1.2rem", display: p.played ? undefined : "none" }}
-                          checked={p.yellowCard}
-                          disabled={p.redCard}
-                          onChange={e => setReportMatch(rm => {
-                            if (!rm) return rm
-                            const copy = JSON.parse(JSON.stringify(rm)) as Match
-                            let p2 = copy.players.find(p2 => p2.id === p.id)
-                            if (!p2) return copy
-                            p2.yellowCard = e.target.checked
-                            return copy
-                          })}
-                        />
-                      </td>
-                      <td>
-                        <input type="checkbox" style={{ width: "1.2rem", height: "1.2rem", display: p.played ? undefined : "none" }}
-                          checked={p.redCard}
-                          onChange={e => setReportMatch(rm => {
-                            if (!rm) return rm
-                            const copy = JSON.parse(JSON.stringify(rm)) as Match
-                            let p2 = copy.players.find(p2 => p2.id === p.id)
-                            if (!p2) return copy
-                            p2.redCard = e.target.checked
-                            if (e.target.checked) p2.yellowCard = false;
-                            return copy
-                          })}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div style={{
-                marginTop: 30,
-                padding: 10,
-                backgroundColor: "lime",
-                borderRadius: 20,
-                color: "black",
-                fontSize: 24,
-                fontWeight: 800
-              }}
-                onClick={updatePointsAndCost}
-              >CONFIRM</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )}
-  </div>
+  )
 }
 
-const theme = {
-  colors: {
-    background: '#101010',
-    surface: '#1a1a1a',
-    primary: '#39ff14',
-    text: '#ffffff',
-    error: '#ff4b2b',
-    pitch: '#142014',
-  }
-};
-
+// --- STYLES ---
 const styles: Record<string, React.CSSProperties> = {
+  pageContainer: {
+    backgroundColor: '#101010',
+    minHeight: '100vh',
+    padding: '20px',
+    paddingBottom: '100px',
+    color: '#fff',
+    fontFamily: '"Inter", sans-serif'
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '30px',
+    marginTop: '20px'
+  },
+  title: {
+    fontSize: '1.5rem',
+    fontWeight: 900,
+    fontStyle: 'italic',
+    letterSpacing: '-1px',
+    margin: 0
+  },
+  reportBtn: {
+    backgroundColor: '#fff',
+    color: '#000',
+    border: 'none',
+    padding: '8px 16px',
+    borderRadius: '4px',
+    fontWeight: 900,
+    fontSize: '10px',
+    letterSpacing: '1px',
+    cursor: 'pointer'
+  },
+  playerList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px'
+  },
+  playerCard: {
+    backgroundColor: '#1a1a1a',
+    display: 'flex',
+    alignItems: 'center',
+    padding: '10px',
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.05)',
+  },
+  imageContainer: {
+    width: '50px',
+    height: '50px',
+    borderRadius: '50%',
+    overflow: 'hidden',
+    marginRight: '15px',
+    backgroundColor: '#222'
+  },
+  playerImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover'
+  },
+  playerInfo: {
+    flexGrow: 1
+  },
+  playerName: {
+    fontWeight: 800,
+    textTransform: 'uppercase',
+    fontSize: '14px',
+    letterSpacing: '0.5px'
+  },
+  playerStats: {
+    fontSize: '10px',
+    color: '#666',
+    fontWeight: 700,
+    marginTop: '2px'
+  },
+  priceTag: {
+    textAlign: 'right',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  priceLabel: {
+    fontSize: '8px',
+    fontWeight: 900,
+    color: '#39ff14'
+  },
+  priceValue: {
+    fontSize: '18px',
+    fontWeight: 900,
+    fontStyle: 'italic'
+  },
+
   // Modal Styles
   overlay: {
     position: 'fixed',
     inset: 0,
-    background: "rgba(0, 0, 0, 0.8)",
-    backdropFilter: 'blur(8px)',
+    background: "rgba(0, 0, 0, 0.9)",
+    backdropFilter: 'blur(4px)',
     display: 'flex',
+    justifyContent: 'center',
     alignItems: 'start',
     zIndex: 2000,
+    paddingTop: '20px'
   },
   modal: {
-    background: theme.colors.background,
-    width: '100%',
+    background: '#101010',
+    width: '95%',
     maxWidth: '500px',
     borderRadius: '20px',
-    padding: '32px',
+    padding: '24px',
     position: 'relative',
-    border: `1px solid black`,
+    border: '1px solid #222',
     maxHeight: '90vh',
-    overflowY: 'auto',    
-  },
-  modalContent: {
-    gap: 16,
-    display: 'flex',
-    overflowX: "clip",
-    flexWrap: "wrap",
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: "column",    
-    marginBottom: "5rem"
+    overflowY: 'auto'
   },
   closeBtn: {
     position: 'absolute',
@@ -392,17 +177,107 @@ const styles: Record<string, React.CSSProperties> = {
     right: '20px',
     background: 'none',
     border: 'none',
-    color: theme.colors.text,
-    fontSize: '1.2rem',
-    cursor: 'pointer',
-    marginBottom: 24,
+    color: '#fff',
+    fontSize: '20px',
+    cursor: 'pointer'
   },
   modalTitle: {
-    fontSize: '2rem',
-    fontWeight: 800,
-    marginBottom: '20px',
-    color: theme.colors.text
+    fontSize: '24px',
+    fontWeight: 900,
+    fontStyle: 'italic',
+    marginBottom: '30px',
+    textAlign: 'center'
+  },
+  scoreSection: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '20px',
+    marginBottom: '40px'
+  },
+  scoreColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center'
+  },
+  inputLabel: {
+    fontSize: '9px',
+    fontWeight: 900,
+    color: '#555',
+    marginBottom: '8px'
+  },
+  scoreInput: {
+    width: '60px',
+    height: '60px',
+    backgroundColor: '#1a1a1a',
+    border: '1px solid #333',
+    borderRadius: '8px',
+    color: '#39ff14',
+    fontSize: '24px',
+    textAlign: 'center',
+    fontWeight: 900
+  },
+  scoreDivider: {
+    fontSize: '24px',
+    fontWeight: 900,
+    color: '#333',
+    marginTop: '20px'
+  },
+  tableContainer: {
+    width: '100%',
+    marginBottom: '30px'
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse'
+  },
+  thRotate: {
+    fontSize: '8px',
+    fontWeight: 900,
+    writingMode: 'vertical-rl',
+    transform: 'rotate(180deg)',
+    padding: '10px 5px',
+    color: '#555'
+  },
+  thNormal: {
+    fontSize: '8px',
+    fontWeight: 900,
+    color: '#555',
+    verticalAlign: 'bottom',
+    paddingBottom: '10px'
+  },
+  tdCenter: {
+    textAlign: 'center',
+    padding: '8px 0'
+  },
+  tdName: {
+    fontSize: '12px',
+    fontWeight: 700,
+    textTransform: 'uppercase'
+  },
+  tableInput: {
+    width: '35px',
+    backgroundColor: '#1a1a1a',
+    border: '1px solid #333',
+    color: '#fff',
+    textAlign: 'center',
+    borderRadius: '4px',
+    fontSize: '12px',
+    padding: '4px 0'
+  },
+  confirmBtn: {
+    width: '100%',
+    backgroundColor: '#39ff14',
+    color: '#000',
+    border: 'none',
+    padding: '16px',
+    borderRadius: '12px',
+    fontWeight: 900,
+    fontSize: '16px',
+    fontStyle: 'italic',
+    cursor: 'pointer',
+    marginTop: '20px'
   }
 };
 
-export default PlayersPage
+export default PlayersPage;

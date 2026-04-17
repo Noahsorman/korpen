@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { auth, googleProvider } from './firebaseConfig';
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
 import type { Timestamp } from 'firebase/firestore';
@@ -7,13 +7,13 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: () => Promise<void>;
-  logout: () => Promise<void>;
-  players: Player[]
-  setPlayers: (p: Player[]) => void;
-  teams: Team[]
-  setTeams: (p: Team[]) => void;
-  matches: Match[]
-  setMatches: (p: Match[]) => void;
+  logout: () => Promise<void>;  
+  players: Player[];
+  setPlayers: Dispatch<SetStateAction<Player[]>>;  
+  teams: Team[];
+  setTeams: Dispatch<SetStateAction<Team[]>>;  
+  matches: Match[];
+  setMatches: Dispatch<SetStateAction<Match[]>>;
 }
 
 export interface Player {
@@ -21,6 +21,7 @@ export interface Player {
   name: string;
   cost: number;
   image: string;
+  oldCost: number;
 }
 
 export interface Team {
@@ -38,22 +39,24 @@ export interface Team {
   };
 }
 
+export interface MatchPlayer {
+  id?: string,
+  played: boolean,
+  goals: number,
+  assists: number,
+  yellowCard: boolean,
+  redCard: boolean,
+}
+
 export interface Match {
   id: string,
   date: Timestamp,
   played: boolean,
   opponentsName: string,
   opponentsColor: string,
-  teamGoals: number | undefined,
-  opponentGoals: number | undefined,
-  players: {
-    id: "string",
-    played: boolean,
-    goals: number,
-    assists: number,
-    yellowCard: boolean,
-    redCard: boolean,
-  }[],
+  teamGoals: number,
+  opponentGoals: number,
+  players: MatchPlayer[],
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

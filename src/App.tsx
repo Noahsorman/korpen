@@ -1,97 +1,90 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth, type Match } from './AuthContext';
+import { AuthProvider, useAuth, type Match, type Player, type Team } from './AuthContext';
 import LoginPage from './LoginPage';
 import TeamBuilder from './TeamBuilderPage';
 import LeaguePage from './LeaguePage';
 import Navbar from './navbar';
 import RulesPage from './RulesPage';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { auth, db } from './firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
 import PlayersPage from './PlayersPage';
 import MatchSchedule from './MatchSchedulePage';
+import LoadingModal from './LoadingModal';
 
-interface Player {
-  id: string;
-  name: string;
-  cost: number;
-  image: string;
-}
-
-interface Team {
-  id: string;
-  owner: string;
-  points: number;
-  budget: number;
-  players: {
-    ST1: string;
-    MF1: string;
-    MF2: string;
-    DF1: string;
-    DF2: string;
-    GK1: string;
-  };
-}
 
 const Root = () => {
   const { user, loading, setPlayers, setTeams, setMatches } = useAuth();
+  const [fetchingData, setFetchingData] = useState(false);
 
-  // Det är bra att vänta på att Firebase kollar om användaren är inloggad
-  if (loading) {
+  const fetchData = async () => {
+    if (!auth?.currentUser) return;
+
+    setFetchingData(true);
+    console.log({ auth: auth.currentUser, user })
+
+    let error = "";
+    try {
+      const p1 = getDocs(collection(db, 'player'));
+      const p2 = getDocs(collection(db, 'teams'));
+      const p3 = getDocs(collection(db, 'matchSchedule'));
+
+      await Promise.all([p1, p2, p3]).then(([pSnap, tSnap, mSnap]) => {
+        const dataPlayers = pSnap.docs
+          .map(d => ({ id: d.id, ...d.data() } as Player))
+          .sort((a, b) => b.cost - a.cost);
+        setPlayers(dataPlayers);
+
+        const dataTeams = tSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Team[];
+        setTeams(dataTeams);
+
+        const dataMatches = mSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Match[];
+        setMatches(dataMatches);
+      }).catch(e => {
+        const err = e as any
+        error = err.message
+      }).finally(() => setFetchingData(false))
+    } catch (e) {
+      const err = e as any
+      error = err.message
+    }
+
+    if (error !== "") alert(error)
+  }
+
+  useEffect(() => { fetchData() }, [user]);
+
+  if (loading || fetchingData) {
     return (
-      <div className="min-h-screen bg-[#101010] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#39ff14]"></div>
-      </div>
+      <LoadingModal
+        image='/logo.svg'
+        text=' '
+      />
     );
   }
 
-  useEffect(() => {
-    if (!auth) return;
-
-    getDocs(collection(db, 'player')).then(pSnap => {
-      const dataPlayers = pSnap.docs
-        .map(d => ({ id: d.id, ...d.data() } as Player))
-        .sort((a, b) => b.cost - a.cost)
-
-      setPlayers(dataPlayers);
-    });
-
-    getDocs(collection(db, 'teams')).then(pSnap => {
-      const teams = pSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Team[]
-      setTeams(teams);
-    });
-
-    getDocs(collection(db, 'matchSchedule')).then(pSnap => {
-      const matches = pSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Match[]
-      setMatches(matches);
-    });
-
-  }, [auth])
+  if (!user) {
+    return <div className="flex flex-col min-h-screen bg-[#101010]">
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/login" />} />
+      </Routes>
+    </div>
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-[#101010]">
-      {/* Navbaren visas bara om användaren är inloggad */}
-      {user && <Navbar />}
-
-      <main className={`${user ? 'pb-24' : ''}`}> {/* Ger plats för navbaren */}
+      <main className={`${user ? 'pb-24' : ''}`}>
         <Routes>
-          {user ? (
-            <>
-              <Route path="/" element={<TeamBuilder />} />
-              <Route path="/league" element={<LeaguePage />} />
-              <Route path="/rules" element={<RulesPage />} />
-              <Route path="/players" element={<PlayersPage />} />
-              <Route path="/schedule" element={<MatchSchedule />} />
-              <Route path="*" element={<Navigate to="/" />} />
-            </>
-          ) : (
-            <>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="*" element={<Navigate to="/login" />} />
-            </>
-          )}
+          <Route path="/" element={<TeamBuilder />} />
+          <Route path="/league" element={<LeaguePage />} />
+          <Route path="/rules" element={<RulesPage />} />
+          <Route path="/players" element={<PlayersPage />} />
+          <Route path="/schedule" element={<MatchSchedule />} />
+          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>
+      <Navbar />
     </div>
   );
 };
