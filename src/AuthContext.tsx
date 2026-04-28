@@ -22,6 +22,7 @@ export interface Player {
   cost: number;
   image: string;
   oldCost: number;
+  number: number
 }
 
 export interface Team {
@@ -57,6 +58,7 @@ export interface Match {
   teamGoals: number,
   opponentGoals: number,
   players: MatchPlayer[],
+  teamId: number
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

@@ -62,7 +62,7 @@ const MatchSchedule = () => {
 
         return prev + playerPoints
       }, 0)
-      
+
       t.points = (t.points || 0) + points
       return t
     })
@@ -99,81 +99,179 @@ const MatchSchedule = () => {
     padding: '10px'
   };
 
-  const cardStyle = (isPlayed: boolean): React.CSSProperties => ({
+  const cardContainerStyle = (isPlayed: boolean): React.CSSProperties => ({
     display: 'flex',
     alignItems: 'center',
-    backgroundColor: isPlayed ? '#111' : '#1a1a1a',
-    borderLeft: isPlayed ? '4px solid #333' : '4px solid #39ff14',
-    marginBottom: '10px',
-    padding: '15px',
-    borderRadius: '4px',
-    opacity: isPlayed ? 0.7 : 1,
+    background: isPlayed
+      ? 'linear-gradient(90deg, #111 0%, #1a1a1a 100%)'
+      : 'linear-gradient(90deg, #1a1a1a 0%, #222 100%)',
+    padding: '12px 20px',
+    borderRadius: '12px',
+    marginBottom: '12px',
+    border: isPlayed ? '1px solid #333' : '1px solid #39ff1433', // Svagt grönt sken för kommande
+    boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+    position: 'relative',
+    overflow: 'hidden',
+    opacity: isPlayed ? 0.85 : 1,
   });
 
-  const dateBoxStyle: React.CSSProperties = {
+  const dateBadgeStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    minWidth: '50px',
+    justifyContent: 'center',
+    paddingRight: '20px',
     borderRight: '1px solid #333',
-    marginRight: '15px'
+    minWidth: '60px',
   };
 
-  const scoreStyle = (t: number, o: number): React.CSSProperties => ({
-    fontSize: '24px',
+  const matchupAreaStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    flex: 1,
+    padding: '0 25px',
+    gap: '15px',
+    flexGrow: 1,
+    justifyContent: "space-around"
+  };
+
+  const teamSideStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',    
+    flexDirection: "column",
+  };
+
+  const logoStyle: React.CSSProperties = {
+    width: '45px',
+    height: '45px',
+    objectFit: 'contain',
+    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
+    borderRadius: "100%",
+  };
+
+  const infoCenterStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    minWidth: '60px',
+  };
+
+  const vsStyle: React.CSSProperties = {
+    fontSize: '12px',
     fontWeight: '900',
-    color: t > o ? '#39ff14' : t < o ? '#ff4444' : '#fff'
+    color: '#39ff14',
+    letterSpacing: '1px',
+    background: '#111',
+    padding: '4px 8px',
+    borderRadius: '4px',
+    border: '1px solid #39ff14',
+  };
+
+  const scoreWrapperStyle = (t: number, o: number): React.CSSProperties => ({
+    fontSize: '26px',
+    fontWeight: '900',
+    fontFamily: 'monospace', // Ger en sportigare digital känsla
+    color: t > o ? '#39ff14' : t < o ? '#ff4444' : '#fff',
+    display: 'flex',
+    alignItems: 'center',
   });
+
+  const statusAreaStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+  };
+
+  const timeStyle: React.CSSProperties = {
+    fontSize: '13px',
+    fontWeight: '700',
+    color: '#39ff14',
+  };
+
+  const playedBadgeStyle: React.CSSProperties = {
+    fontSize: '9px',
+    fontWeight: '700',
+    color: '#666',
+    background: '#222',
+    padding: '2px 6px',
+    borderRadius: '3px',
+    marginTop: '4px'
+  };
+
+  const teamName: React.CSSProperties = {
+    fontSize: '12px',
+    fontWeight: '700',
+    color: '#888',
+    textWrap: "nowrap",
+    position: "absolute",
+    top: "4.3rem"
+  };
 
   return (
     <div style={containerStyle}>
-      <div style={{display: "flex"}}>
-        <h2 style={{ fontStyle: 'italic', fontWeight: '900', letterSpacing: '-1px', flex:1 }}>
-          MATCHER <span style={{ color: '#39ff14' }}>&</span> RESULTAT          
+      <div style={{ display: "flex" }}>
+        <h2 style={{ fontStyle: 'italic', fontWeight: '900', letterSpacing: '-1px', flex: 1 }}>
+          MATCHER <span style={{ color: '#39ff14' }}>&</span> RESULTAT
         </h2>
-        <button 
-            style={styles.reportBtn}
-            onClick={() => setReportMatch({
-              teamGoals: 0, opponentGoals: 0, id: "",
-              players: players.map(p => ({ id: p.id, played: true, goals: 0, assists: 0, yellowCard: false, redCard: false })),
-              played: false, date: Timestamp.now(), opponentsName: "", opponentsColor: "red"
-            })}
-          >
-            RAPPORTERA MATCH
-          </button>
+        <button
+          style={styles.reportBtn}
+          onClick={() => setReportMatch({
+            teamGoals: 0, opponentGoals: 0, id: "",
+            players: players.map(p => ({ id: p.id, played: true, goals: 0, assists: 0, yellowCard: false, redCard: false })),
+            played: false, date: Timestamp.now(), opponentsName: "", opponentsColor: "red", teamId: 0
+          })}
+        >
+          RAPPORTERA MATCH
+        </button>
       </div>
 
       {sortedMatches.map((match, i) => {
         const { day, month, time } = formatDate(match.date);
-        
+
         return (
-          <div key={i} style={cardStyle(match.played)}>
-            {/* Datum */}
-            <div style={dateBoxStyle}>
-              <span style={{ fontSize: '10px', color: '#888' }}>{month}</span>
-              <span style={{ fontSize: '20px', fontWeight: '900' }}>{day}</span>
-            </div>
-
-            {/* Motståndare */}
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: match.opponentsColor }} />
-                <span style={{ fontWeight: '700', textTransform: 'uppercase' }}>{match.opponentsName}</span>
+          <div key={i} style={cardContainerStyle(match.played)}>
+            {/* Vänster: Datum-badge */}
+            <div style={dateBadgeStyle}>
+              <span style={{ fontSize: '11px', fontWeight: '600', color: '#888', textTransform: 'uppercase' }}>{month}</span>
+              <span style={{ fontSize: '22px', fontWeight: '900', lineHeight: '1' }}>{day}</span>{/* Höger: Detaljer & Status */}
+              <div style={statusAreaStyle}>
+                <div style={{ textAlign: 'right' }}>
+                  {!match.played ? (
+                    <div style={timeStyle}>KL {time}</div>
+                  ) : (
+                    <div style={playedBadgeStyle}>AVSLUTAD</div>
+                  )}
+                </div>
               </div>
-              {!match.played && <div style={{ fontSize: '12px', color: '#39ff14', marginTop: '4px' }}>KL {time}</div>}
             </div>
 
-            {/* Resultat eller Status */}
-            <div>
-              {match.played ? (
-                <div style={scoreStyle(match.teamGoals || 0, match.opponentGoals || 0)}>
-                  {match.teamGoals}-{match.opponentGoals}
-                </div>
-              ) : (
-                <div style={{ fontSize: '10px', fontWeight: '900', color: '#39ff14', border: '1px solid #39ff14', padding: '2px 5px' }}>
-                  UPCOMING
-                </div>
-              )}
+            {/* Mitten: Matchup */}
+            <div style={matchupAreaStyle}>
+              {/* Vårt lag */}
+              <div style={teamSideStyle}>
+                <img src={"https://korpenkorpforeningenjonkoping.zoezi.se/api/public/image/get?size=200x200&type=team&id=536"} alt="Vår logga" style={logoStyle} />
+                <div style={teamName}>Unatletico Madrid</div>
+              </div>
+
+              {/* VS / Resultat-sektion */}
+              <div style={infoCenterStyle}>
+                {match.played ? (
+                  <div style={scoreWrapperStyle(match.teamGoals || 0, match.opponentGoals || 0)}>
+                    <span>{match.teamGoals}</span>
+                    <span style={{ color: '#444', margin: '0 4px' }}>-</span>
+                    <span>{match.opponentGoals}</span>
+                  </div>
+                ) : (
+                  <div style={vsStyle}>VS</div>
+                )}
+              </div>
+
+              {/* Motståndare */}
+              <div style={teamSideStyle}>
+                <img src={`https://korpenkorpforeningenjonkoping.zoezi.se/api/public/image/get?size=200x200&type=team&id=${match.teamId}`} alt={match.opponentsName} style={logoStyle} />
+                <div style={teamName}>{match.opponentsName}</div>
+              </div>
             </div>
           </div>
         );
@@ -184,13 +282,13 @@ const MatchSchedule = () => {
           <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
             <button style={styles.closeBtn} onClick={() => setReportMatch(null)}>✕</button>
             <h2 style={styles.modalTitle}>MATCHRAPPORT</h2>
-            
+
             <div style={styles.modalContent}>
               {/* RESULTAT-INPUTS */}
               <div style={styles.scoreSection}>
                 <div style={styles.scoreColumn}>
                   <label style={styles.inputLabel}>UNATLETICO</label>
-                  <input 
+                  <input
                     type="number"
                     style={styles.scoreInput}
                     value={reportMatch.teamGoals >= 0 ? reportMatch.teamGoals : ""}
@@ -201,7 +299,7 @@ const MatchSchedule = () => {
                 <div style={styles.scoreDivider}>—</div>
                 <div style={styles.scoreColumn}>
                   <label style={styles.inputLabel}>MOTSTÅNDARE</label>
-                  <input 
+                  <input
                     type="number"
                     style={styles.scoreInput}
                     value={reportMatch.opponentGoals >= 0 ? reportMatch.opponentGoals : ""}
@@ -228,8 +326,8 @@ const MatchSchedule = () => {
                     {reportMatch.players.map((p, idx) => (
                       <tr key={p.id} style={{ borderBottom: '1px solid #222', opacity: p.played ? 1 : 0.4 }}>
                         <td style={styles.tdCenter}>
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             checked={p.played}
                             onChange={e => {
                               const newPlayers = [...reportMatch.players];
@@ -240,50 +338,50 @@ const MatchSchedule = () => {
                         </td>
                         <td style={styles.tdName}>{players.find(pl => pl.id === p.id)?.name}</td>
                         <td style={styles.tdCenter}>
-                          <input 
-                            type="number" 
-                            style={styles.tableInput} 
+                          <input
+                            type="number"
+                            style={styles.tableInput}
                             disabled={!p.played}
                             value={p.goals <= 0 ? "" : p.goals}
                             onChange={e => {
-                               const newP = [...reportMatch.players];
-                               newP[idx].goals = parseInt(e.target.value) || -1;
-                               setReportMatch({...reportMatch, players: newP});
+                              const newP = [...reportMatch.players];
+                              newP[idx].goals = parseInt(e.target.value) || -1;
+                              setReportMatch({ ...reportMatch, players: newP });
                             }}
                             min={0}
                           />
                         </td>
                         <td style={styles.tdCenter}>
-                          <input 
-                            type="number" 
-                            style={styles.tableInput} 
+                          <input
+                            type="number"
+                            style={styles.tableInput}
                             disabled={!p.played}
                             value={p.assists <= 0 ? "" : p.assists}
                             onChange={e => {
-                               const newP = [...reportMatch.players];
-                               newP[idx].assists = parseInt(e.target.value) || 0;
-                               setReportMatch({...reportMatch, players: newP});
+                              const newP = [...reportMatch.players];
+                              newP[idx].assists = parseInt(e.target.value) || 0;
+                              setReportMatch({ ...reportMatch, players: newP });
                             }}
                             min={0}
                           />
                         </td>
                         <td style={styles.tdCenter}>
-                           <input type="checkbox" 
-                            checked={p.yellowCard} 
-                            disabled={!p.played || p.redCard} 
+                          <input type="checkbox"
+                            checked={p.yellowCard}
+                            disabled={!p.played || p.redCard}
                             onChange={e => {
-                             const newP = [...reportMatch.players];
-                             newP[idx].yellowCard = e.target.checked;
-                             setReportMatch({...reportMatch, players: newP});
-                           }} />
+                              const newP = [...reportMatch.players];
+                              newP[idx].yellowCard = e.target.checked;
+                              setReportMatch({ ...reportMatch, players: newP });
+                            }} />
                         </td>
                         <td style={styles.tdCenter}>
-                           <input type="checkbox" checked={p.redCard} disabled={!p.played} onChange={e => {
-                             const newP = [...reportMatch.players];
-                             newP[idx].redCard = e.target.checked;
-                             if(e.target.checked) newP[idx].yellowCard = false;
-                             setReportMatch({...reportMatch, players: newP});
-                           }} />
+                          <input type="checkbox" checked={p.redCard} disabled={!p.played} onChange={e => {
+                            const newP = [...reportMatch.players];
+                            newP[idx].redCard = e.target.checked;
+                            if (e.target.checked) newP[idx].yellowCard = false;
+                            setReportMatch({ ...reportMatch, players: newP });
+                          }} />
                         </td>
                       </tr>
                     ))}

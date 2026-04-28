@@ -36,7 +36,15 @@ const PlayersPage = () => {
           <div key={p.id} style={styles.playerCard}>
             <div style={styles.imageContainer}>
               <img src={p.image} alt={p.name} style={styles.playerImg} />
-            </div>
+              <span style={{
+              //fontSize: '1.5rem',
+              position: "absolute",
+              fontWeight: 900,
+              fontStyle: 'italic',
+              letterSpacing: '-1px',
+              margin: 0
+            }}>{p.number}</span>
+            </div>            
             
             <div style={styles.playerInfo}>
               <div style={styles.playerName}>{p.name}</div>
